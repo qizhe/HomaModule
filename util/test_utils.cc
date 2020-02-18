@@ -187,7 +187,7 @@ const char *print_address(struct sockaddr_in *addr)
 #define BUF_SIZE 50
 #define NUM_BUFFERS 16
 	static char buffers[NUM_BUFFERS][BUF_SIZE];
-	static std::atomic<int> next_buffer = 0;
+	static std::atomic<int> next_buffer = {0};
 	
 	char *buffer = buffers[next_buffer.fetch_add(1)
 		& (NUM_BUFFERS-1)];

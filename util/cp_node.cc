@@ -43,7 +43,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
-#include <optional>
+#include <experimental/optional>
 #include <random>
 #include <thread>
 #include <vector>
@@ -659,7 +659,7 @@ class tcp_server {
 	 * @thread: Background thread that both accepts connections and
 	 * services requests on them.
 	 */
-	std::optional<std::thread> thread;
+	std::experimental::optional<std::thread> thread;
 	
 	/** @stop: True means that background threads should exit. */
 	bool stop;
@@ -1104,13 +1104,13 @@ class homa_client : public client {
 	bool stop;
 	
 	/** @receiver: thread that receives responses. */
-	std::optional<std::thread> receiving_thread;
+	std::experimental::optional<std::thread> receiving_thread;
 	
 	/**
 	 * @sender: thread that sends requests (may also receive
 	 * responses if --alt-client has been specified).
 	 */
-	std::optional<std::thread> sending_thread;
+	std::experimental::optional<std::thread> sending_thread;
 };
 
 /**
@@ -1316,13 +1316,13 @@ class tcp_client : public client {
 	bool stop;
 	
 	/** @receiver: thread that receives responses. */
-	std::optional<std::thread> receiving_thread;
+	std::experimental::optional<std::thread> receiving_thread;
 	
 	/**
 	 * @sender: thread that sends requests (may also receive
 	 * responses if --alt-client has been specified).
 	 */
-	std::optional<std::thread> sending_thread;
+	std::experimental::optional<std::thread> sending_thread;
 };
 
 /**
