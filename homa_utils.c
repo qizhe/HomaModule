@@ -393,8 +393,10 @@ void homa_rpc_free(struct homa_rpc *rpc)
  */
 int homa_rpc_reap(struct homa_sock *hsk)
 {
-	struct sk_buff *skbs[hsk->homa->reap_limit];
-	struct homa_rpc *rpcs[hsk->homa->reap_limit];
+	struct sk_buff **skbs = kmalloc(hsk->homa->reap_limit * sizeof(struct sk_buff*), GFP_KERNEL);
+	struct homa_rpc **rpcs = kmalloc(hsk->homa->reap_limit * sizeof(struct homa_rpc*), GFP_KERNEL);
+	// struct sk_buff *skbs[hsk->homa->reap_limit];
+	// struct homa_rpc *rpcs[hsk->homa->reap_limit];
 	int num_skbs = 0;
 	int num_rpcs = 0;
 	struct homa_rpc *rpc;
@@ -403,6 +405,8 @@ int homa_rpc_reap(struct homa_sock *hsk)
 	
 	if (atomic_read(&hsk->reap_disable)) {
 		INC_METRIC(disabled_reaps, 1);
+		kfree(skbs);
+		kfree(rpcs);
 		return -1;
 	}
 	INC_METRIC(reaper_calls, 1);
@@ -459,8 +463,11 @@ int homa_rpc_reap(struct homa_sock *hsk)
 release:
 	tt_record2("reaping %d skbs, %d rpcs", num_skbs, num_rpcs);
         
-	if ((num_skbs == 0) && (num_rpcs == 0))
+	if ((num_skbs == 0) && (num_rpcs == 0)) {
+		kfree(skbs);
+		kfree(rpcs);
 		return 0;
+	}
 	hsk->dead_skbs -= num_skbs;
 	homa_sock_unlock(hsk);
 	for (i = 0; i < num_skbs; i++) {
@@ -477,6 +484,8 @@ release:
 		kfree(rpcs[i]);
 	}
 	homa_sock_lock(hsk, "homa_rpc_reap");
+	kfree(skbs);
+	kfree(rpcs);
 	return 1;
 }
 

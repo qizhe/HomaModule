@@ -182,7 +182,7 @@ void homa_sock_shutdown(struct homa_sock *hsk)
 		homa_sock_unlock(hsk);
 		return;
 	}
-	printk(KERN_NOTICE "Shutting down socket %d, id %lu",
+	printk(KERN_NOTICE "Shutting down socket %d, id %lld",
 			hsk->client_port, atomic64_read(&hsk->next_outgoing_id));
 	atomic_inc(&hsk->reap_disable);
 	

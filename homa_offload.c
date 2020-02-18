@@ -65,7 +65,7 @@ int homa_offload_end(void)
  * list by the caller and passed up the stack immediately. This function
  * always returns NULL.
  */
-struct sk_buff **homa_gro_receive(struct sk_buff **gro_list, struct sk_buff *skb)
+struct sk_buff *homa_gro_receive(struct list_head *gro_list, struct sk_buff *skb)
 {
 	/* This function will do one of the following things:
 	 * 1. Merge skb with a packet in gro_list by appending it to
@@ -79,8 +79,8 @@ struct sk_buff **homa_gro_receive(struct sk_buff **gro_list, struct sk_buff *skb
 	 */
 	struct common_header *h_new;
 	int hdr_offset, hdr_end;
-	struct sk_buff *held_skb;
-	struct sk_buff **pp;
+	// struct sk_buff *held_skb;
+	struct sk_buff *pp = NULL;
 	
 	/* Get access to the Homa header for the packet. I don't understand
 	 * why such ornate code is needed, but this mimics what TCP does.
@@ -99,36 +99,66 @@ struct sk_buff **homa_gro_receive(struct sk_buff **gro_list, struct sk_buff *skb
 	}
 	
 	h_new->gro_count = 1;
-	for (pp = gro_list; (held_skb = *pp) != NULL; pp = &held_skb->next) {
+	list_for_each_entry(pp, gro_list, list) {
 		struct common_header *h_held;
-		if (!NAPI_GRO_CB(held_skb)->same_flow)
+		if (!NAPI_GRO_CB(pp)->same_flow)
 			continue;
 
-		h_held = (struct common_header *) skb_transport_header(held_skb);
+		h_held = (struct common_header *) skb_transport_header(pp);
 
 		/* Note: Homa will aggregate packets from different RPCs
 		 * and different ports in order to maximize the benefits
 	         * of GRO.
 	         */
 		
-		/* Aggregate skb into held_skb. We don't update the length of
-		 * held_skb, because we'll eventually split it up and process
+		/* Aggregate skb into pp. We don't update the length of
+		 * pp, because we'll eventually split it up and process
 		 * each skb independently.
 		 */
-		if (NAPI_GRO_CB(held_skb)->last == held_skb)
-			skb_shinfo(held_skb)->frag_list = skb;
+		if (NAPI_GRO_CB(pp)->last == pp)
+			skb_shinfo(pp)->frag_list = skb;
 		else
-			NAPI_GRO_CB(held_skb)->last->next = skb;
-		NAPI_GRO_CB(held_skb)->last = skb;
+			NAPI_GRO_CB(pp)->last->next = skb;
+		NAPI_GRO_CB(pp)->last = skb;
 		skb->next = NULL;
 		NAPI_GRO_CB(skb)->same_flow = 1;
-		NAPI_GRO_CB(held_skb)->count++;
+		NAPI_GRO_CB(pp)->count++;
 		h_held->gro_count++;
 		if (h_held->gro_count >= homa->max_gro_skbs)
 			return pp;
 	        break;
 	}
 	return NULL;
+	// for (pp = gro_list; (held_skb = *pp) != NULL; pp = &held_skb->next) {
+	// 	struct common_header *h_held;
+	// 	if (!NAPI_GRO_CB(held_skb)->same_flow)
+	// 		continue;
+
+	// 	h_held = (struct common_header *) skb_transport_header(held_skb);
+
+	// 	/* Note: Homa will aggregate packets from different RPCs
+	// 	 * and different ports in order to maximize the benefits
+	//          * of GRO.
+	//          */
+		
+	// 	 Aggregate skb into held_skb. We don't update the length of
+	// 	 * held_skb, because we'll eventually split it up and process
+	// 	 * each skb independently.
+		 
+	// 	if (NAPI_GRO_CB(held_skb)->last == held_skb)
+	// 		skb_shinfo(held_skb)->frag_list = skb;
+	// 	else
+	// 		NAPI_GRO_CB(held_skb)->last->next = skb;
+	// 	NAPI_GRO_CB(held_skb)->last = skb;
+	// 	skb->next = NULL;
+	// 	NAPI_GRO_CB(skb)->same_flow = 1;
+	// 	NAPI_GRO_CB(held_skb)->count++;
+	// 	h_held->gro_count++;
+	// 	if (h_held->gro_count >= homa->max_gro_skbs)
+	// 		return pp;
+	//         break;
+	// }
+	// return NULL;
 	
 flush:
 	NAPI_GRO_CB(skb)->flush = 1;

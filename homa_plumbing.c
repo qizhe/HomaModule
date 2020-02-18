@@ -1015,7 +1015,7 @@ int homa_backlog_rcv(struct sock *sk, struct sk_buff *skb)
  * @skb:   The incoming packet.
  * @info:  Information about the error that occurred?
  */
-void homa_err_handler(struct sk_buff *skb, u32 info) {
+int homa_err_handler(struct sk_buff *skb, u32 info) {
 	const struct iphdr *iph = (const struct iphdr *)skb->data;
 	int type = icmp_hdr(skb)->type;
 	int code = icmp_hdr(skb)->code;
@@ -1029,12 +1029,14 @@ void homa_err_handler(struct sk_buff *skb, u32 info) {
 		tt_record2("ICMP destination unreachable: 0x%x (daddr 0x%x)",
 				ntohl(iph->saddr), ntohl(iph->daddr));
 		homa_peer_abort(homa, iph->daddr, error);
+		return error;
 	} else {
 		if (homa->verbose)
 			printk(KERN_NOTICE "homa_err_handler invoked with "
 				"info %x, ICMP type %d, ICMP code %d\n",
 				info, type, code);
 	}
+	return 0;
 }
 
 /**
@@ -1057,8 +1059,9 @@ __poll_t homa_poll(struct file *file, struct socket *sock,
 	 * acquire the socket lock, so we don't do it here; not sure
 	 * why...
 	 */
-	
-	sock_poll_wait(file, sk_sleep(sk), wait);
+	sock_poll_wait(file, sock, wait);
+
+	// sock_poll_wait(file, sk_sleep(sk), wait);
 	mask = POLLOUT | POLLWRNORM;
 	
 	if (!list_empty(&homa_sk(sk)->ready_requests) ||

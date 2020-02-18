@@ -33,6 +33,7 @@
 #include <linux/skbuff.h>
 #include <linux/version.h>
 #include <linux/socket.h>
+#include <linux/indirect_call_wrapper.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/inet_common.h>
@@ -1819,7 +1820,7 @@ extern int      homa_diag_destroy(struct sock *sk, int err);
 extern int      homa_disconnect(struct sock *sk, int flags);
 extern int      homa_dointvec(struct ctl_table *table, int write,
 			void __user *buffer, size_t *lenp, loff_t *ppos);
-extern void     homa_err_handler(struct sk_buff *skb, u32 info);
+extern int     homa_err_handler(struct sk_buff *skb, u32 info);
 extern struct sk_buff
                 *homa_fill_packets(struct homa *homa, struct homa_peer *peer,
 			char __user *from, size_t len);
@@ -1837,7 +1838,7 @@ extern int      homa_getsockopt(struct sock *sk, int level, int optname,
 extern void     homa_grant_pkt(struct sk_buff *skb, struct homa_rpc *rpc);
 extern int      homa_gro_complete(struct sk_buff *skb, int thoff);
 extern struct sk_buff
-		**homa_gro_receive(struct sk_buff **head, struct sk_buff *skb);
+		*homa_gro_receive(struct list_head *head, struct sk_buff *skb);
 extern int      homa_hash(struct sock *sk);
 extern enum hrtimer_restart
 		homa_hrtimer(struct hrtimer *timer);
