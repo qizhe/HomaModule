@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
-	status = getaddrinfo(host, "80", &hints, &result);
+	status = getaddrinfo(host, "4000", &hints, &result);
 	if (status != 0) {
 		printf("Couldn't look up address for %s: %s\n",
 				host, gai_strerror(status));
