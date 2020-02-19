@@ -23,10 +23,14 @@
  * 
  * Type "server --help" for documenation on the options.
  */
+ #include <arpa/inet.h>
+#include <chrono>         // std::chrono::seconds
 
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <netinet/tcp.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -36,7 +40,7 @@
 #include <sys/socket.h>
 
 #include <thread>
-
+#include <vector>
 #include "homa.h"
 #include "test_utils.h"
 
@@ -58,8 +62,9 @@ bool validate = false;
  * that socket.
  * @port:   Port number to use for the Homa socket.
  */
-void homa_server(int port)
+void homa_server(std::string ip, int port)
 {
+	printf("start homa server\n");
 	int fd;
 	struct sockaddr_in addr_in;
 	int message[1000000];
@@ -75,6 +80,10 @@ void homa_server(int port)
 	memset(&addr_in, 0, sizeof(addr_in));
 	addr_in.sin_family = AF_INET;
 	addr_in.sin_port = htons(port);
+	inet_pton(AF_INET, ip.c_str(), &addr_in.sin_addr);
+	// inet_aton("10.0.0.10", &addr_in.sin_addr);
+	// addr_in.sin_addr.s_addr = INADDR_ANY;
+
 	if (bind(fd, (struct sockaddr *) &addr_in, sizeof(addr_in)) != 0) {
 		printf("Couldn't bind socket to Homa port %d: %s\n", port,
 				strerror(errno));
@@ -86,7 +95,7 @@ void homa_server(int port)
 		uint64_t id = 0;
 		int seed;
 		int result;
-		
+		printf("try to rec pkt\n");
 		length = homa_recv(fd, message, sizeof(message),
 			HOMA_RECV_REQUEST, &id, (struct sockaddr *) &source,
 			sizeof(source));
@@ -118,6 +127,7 @@ void homa_server(int port)
 			printf("Homa_reply failed: %s\n", strerror(errno));
 		}
 	}
+	printf("end\n");
 }
 
 /**
@@ -265,7 +275,7 @@ void tcp_server(int port)
 int main(int argc, char** argv) {
 	int next_arg;
 	int num_ports = 1;
-	
+	std::string ip;
 	if ((argc >= 2) && (strcmp(argv[1], "--help") == 0)) {
 		print_help(argv[0]);
 		exit(0);
@@ -284,7 +294,16 @@ int main(int argc, char** argv) {
 			next_arg++;
 			port = get_int(argv[next_arg],
 					"Bad port %s; must be positive integer\n");
-		} else if (strcmp(argv[next_arg], "--num_ports") == 0) {
+		} else if (strcmp(argv[next_arg], "--ip") == 0) {
+			if (next_arg == (argc-1)) {
+				printf("No value provided for %s option\n",
+					argv[next_arg]);
+				exit(1);
+			}
+			next_arg++;
+			ip = std::string(argv[next_arg]);
+		} 
+		else if (strcmp(argv[next_arg], "--num_ports") == 0) {
 			if (next_arg == (argc-1)) {
 				printf("No value provided for %s option\n",
 					argv[next_arg]);
@@ -303,11 +322,14 @@ int main(int argc, char** argv) {
 			exit(1);
 		}
 	}
-	
+ 	std::vector<std::thread> workers;
+
 	for (int i = 0; i < num_ports; i++) {
-		std::thread thread(homa_server, port+i);
-		thread.detach();
+		printf("port number:%i\n", port + i);
+		workers.push_back(std::thread (homa_server, ip, port+i));
 	}
-	
-	tcp_server(port);
+	for(int i = 0; i < num_ports; i++) {
+		workers[i].join();
+	}
+	// tcp_server(port);
 }
