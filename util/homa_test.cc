@@ -45,7 +45,7 @@
 int length = 100;
 
 /* How many iterations to perform for the test. */
-int count = 1000;
+int count = 100000;
 
 /* Used to generate "somewhat random but predictable" contents for buffers. */
 int seed = 12345;
@@ -740,6 +740,7 @@ void test_udpclose()
 int main(int argc, char** argv)
 {
 	int fd, status, port, nextArg;
+	struct sockaddr_in addr_in;
 	struct addrinfo *matching_addresses;
 	struct sockaddr *dest;
 	struct addrinfo hints;
@@ -808,7 +809,7 @@ int main(int argc, char** argv)
 			exit(1);
 		}
 	}
-	
+	// get destination address
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -824,11 +825,23 @@ int main(int argc, char** argv)
 	ibuf[0] = ibuf[1] = length;
 	seed_buffer(&ibuf[2], sizeof32(buffer) - 2*sizeof32(int), seed);
 	
+
 	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_HOMA);
 	if (fd < 0) {
 		printf("Couldn't open Homa socket: %s\n", strerror(errno));
 	}
-	
+	memset(&addr_in, 0, sizeof(addr_in));
+	addr_in.sin_family = AF_INET;
+	addr_in.sin_port = htons(4000);
+	inet_pton(AF_INET, "10.0.0.10", &addr_in.sin_addr);
+	// inet_aton("10.0.0.10", &addr_in.sin_addr);
+	// addr_in.sin_addr.s_addr = INADDR_ANY;
+
+	if (bind(fd, (struct sockaddr *) &addr_in, sizeof(addr_in)) != 0) {
+		printf("Couldn't bind socket to Homa port %d: %s\n", port,
+				strerror(errno));
+		return -1;
+	}
 	for ( ; nextArg < argc; nextArg++) {
 		if (strcmp(argv[nextArg], "close") == 0) {
 			test_close();
