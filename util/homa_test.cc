@@ -21,7 +21,8 @@
 //
 // host:port gives the location of a server to invoke
 // Each op specifies a particular test to perform
-
+#include <ctime>
+#include<chrono>
 #include <errno.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
@@ -358,33 +359,38 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 	ssize_t resp_length;
 	uint64_t start;
 	uint64_t times[count];
+    std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
+    while(1) {
+		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
+	            break;
+		for (int i = -10; i < count; i++) {
+			start = rdtsc();
+			status = homa_send(fd, request, length, dest,
+					sizeof(*dest), &id);
+			if (status < 0) {
+				printf("Error in homa_send: %s\n",
+						strerror(errno));
+				return;
+			}
+			resp_length = homa_recv(fd, response, sizeof(response),
+				HOMA_RECV_RESPONSE, &id,
+				(struct sockaddr *) &server_addr, sizeof(server_addr));
+			if (i >= 0)
+				times[i] = rdtsc() - start;
+			if (resp_length < 0) {
+				printf("Error in homa_recv: %s\n",
+						strerror(errno));
+				return;
+			}
+			if (resp_length != length)
+				printf("Expected %d bytes in response, received %ld\n",
+						length, resp_length);
+		}
+		print_dist(times, count);
+		printf("Bandwidth at median: %.1f MB/sec\n",
+				2.0*((double) length)/(to_seconds(times[count/2])*1e06));
+    }
 
-	for (int i = -10; i < count; i++) {
-		start = rdtsc();
-		status = homa_send(fd, request, length, dest,
-				sizeof(*dest), &id);
-		if (status < 0) {
-			printf("Error in homa_send: %s\n",
-					strerror(errno));
-			return;
-		}
-		resp_length = homa_recv(fd, response, sizeof(response),
-			HOMA_RECV_RESPONSE, &id,
-			(struct sockaddr *) &server_addr, sizeof(server_addr));
-		if (i >= 0)
-			times[i] = rdtsc() - start;
-		if (resp_length < 0) {
-			printf("Error in homa_recv: %s\n",
-					strerror(errno));
-			return;
-		}
-		if (resp_length != length)
-			printf("Expected %d bytes in response, received %ld\n",
-					length, resp_length);
-	}
-	print_dist(times, count);
-	printf("Bandwidth at median: %.1f MB/sec\n",
-			2.0*((double) length)/(to_seconds(times[count/2])*1e06));
 }
 
 /**
