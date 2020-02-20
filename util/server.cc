@@ -95,7 +95,6 @@ void homa_server(std::string ip, int port)
 		uint64_t id = 0;
 		int seed;
 		int result;
-		printf("try to rec pkt\n");
 		length = homa_recv(fd, message, sizeof(message),
 			HOMA_RECV_REQUEST, &id, (struct sockaddr *) &source,
 			sizeof(source));
