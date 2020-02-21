@@ -620,20 +620,27 @@ void test_tcp(char *server_name, int port)
 	seed_buffer(&buffer[2], sizeof32(buffer) - 2*sizeof32(int), seed);
 	for (i = 0; i < 10; i++)
 		tcp_ping(stream, buffer, length);
-	
-	uint64_t times[count+1];
-	for (i = 0; i < count; i++) {
-		times[i] = rdtsc();
-		tcp_ping(stream, buffer, length);
+
+    std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
+
+	while(1) {
+		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
+	        break;
+		uint64_t times[count+1];
+		for (i = 0; i < count; i++) {
+			times[i] = rdtsc();
+			tcp_ping(stream, buffer, length);
+		}
+		times[count] = rdtsc();
+		
+		for (i = 0; i < count; i++) {
+			times[i] = times[i+1] - times[i];
+		}
+		print_dist(times, count);
+		printf("Bandwidth at median: %.1f MB/sec\n",
+				2.0*((double) length)/(to_seconds(times[count/2])*1e06));
 	}
-	times[count] = rdtsc();
-	
-	for (i = 0; i < count; i++) {
-		times[i] = times[i+1] - times[i];
-	}
-	print_dist(times, count);
-	printf("Bandwidth at median: %.1f MB/sec\n",
-			2.0*((double) length)/(to_seconds(times[count/2])*1e06));
+
 	return;
 }
 
