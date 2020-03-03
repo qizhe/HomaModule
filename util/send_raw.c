@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 	bytes = (uint8_t *) &addr->sin_addr;
 	printf("Destination address: %x (%d.%d.%d.%d)\n", addr->sin_addr.s_addr,
 		bytes[0], bytes[1], bytes[2], bytes[3]);
-	
+	printf("port number: %u\n",(unsigned int)ntohs(addr->sin_port));
 	fd = socket(AF_INET, SOCK_RAW, protocol);
 	if (fd < 0) {
 		printf("Couldn't open raw socket: %s\n", strerror(errno));

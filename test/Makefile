@@ -30,8 +30,8 @@ DEFS :=      -D__KERNEL__ \
 	     -D KBUILD_MODNAME='"homa"'
 
 WARNS :=     -Wall -Werror -Wundef -Wno-trigraphs -Wno-sign-compare
-CFLAGS :=    $(WARNS) -Wstrict-prototypes -MD -g $(CINCLUDES) $(DEFS)
-CCFLAGS :=   -std=c++11 $(WARNS) -MD -g $(CCINCLUDES) $(DEFS)
+CFLAGS :=     -Wstrict-prototypes -MD -g $(CINCLUDES) $(DEFS)
+CCFLAGS :=   -std=c++11  -MD -g $(CCINCLUDES) $(DEFS)
 	
 TEST_SRCS :=  unit_homa_incoming.c \
 	      unit_homa_offload.c \

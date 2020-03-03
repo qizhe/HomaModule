@@ -86,13 +86,21 @@ extern void     homa_throttle_lock_slow(struct homa *homa);
  */
 enum homa_packet_type {
 	DATA               = 20,
+	// RESUE for DCACP
 	GRANT              = 21,
+
 	RESEND             = 22,
 	RESTART            = 23,
 	BUSY               = 24,
 	CUTOFFS            = 25,
 	FREEZE             = 26,
-	BOGUS              = 27,      /* Used only in unit tests. */
+	//For DCACP
+	NOTIFICATION	   = 27,
+	RTS                = 28,
+	ACCEPT			   = 29,
+	DCACP_GRANT			   = 30,
+
+	BOGUS              = 31,      /* Used only in unit tests. */
 	/* If you add a new type here, you must also do the following:
 	 * 1. Change BOGUS so it is the highest opcode
 	 * 2. Add support for the new opcode in homa_print_packet,
@@ -197,8 +205,12 @@ struct common_header {
 	 * the checksum in a TCP header (TSO may modify this?).*/
 	__be16 checksum;
 	
-	__be16 unused4;
-	
+	/**
+	 * @priority: the priority at which the packet was set; used
+	 * only for debugging.
+	 */
+	__u16 priority;
+		
 	/**
 	 * @id: Identifier for the RPC associated with this packet; must
 	 * be unique among all those issued from the client port. Stored
@@ -398,6 +410,7 @@ struct cutoffs_header {
 _Static_assert(sizeof(struct cutoffs_header) <= HOMA_MAX_HEADER,
 		"cutoffs_header too large");
 
+
 /**
  * struct freeze_header - Wire format for FREEZE packets.
  * 
@@ -410,6 +423,116 @@ struct freeze_header {
 } __attribute__((packed));
 _Static_assert(sizeof(struct freeze_header) <= HOMA_MAX_HEADER,
 		"freeze_header too large");
+
+
+// ---
+
+/**
+ * struct notification_header - Wire format for NOTIFICATION packets.
+ * 
+ * send DCACP NOTIFICATION packets for matching from the sender to the receiver
+ */
+struct notification_header {
+	/** @common: Fields common to all packet types. */
+	struct common_header common;
+	/**
+	 * @flow_id: flow id should be unique within one socket.
+	 */
+	__be32 message_id;
+	/**
+	 * @flow_size: Byte flow_size of the message
+	 */
+	__be64 message_size;
+
+
+	
+	/**
+	 * @priority: The sender should use this priority level for all future
+	 * MESSAGE_FRAG packets for this message, until a GRANT is received
+	 * with higher offset. Larger numbers indicate higher priorities.
+	 */
+	__u8 priority;
+} __attribute__((packed));
+_Static_assert(sizeof(struct notification_header) <= HOMA_MAX_HEADER,
+		"notification_header too large");
+
+/**
+ * struct rts_header - Wire format for RTS packets.
+ * 
+ * send DCACP RTS packets for matching from the receiver to the sender
+ */
+struct rts_header {
+	/** @common: Fields common to all packet types. */
+	struct common_header common;
+	
+	/**
+	 * @flow_size: Byte flow_size of the message.
+	 */
+	__be64 message_size;
+	
+	/**
+	 * @priority: The sender should use this priority level for all future
+	 * MESSAGE_FRAG packets for this message, until a GRANT is received
+	 * with higher offset. Larger numbers indicate higher priorities.
+	 */
+	__u8 priority;
+} __attribute__((packed));
+_Static_assert(sizeof(struct rts_header) <= HOMA_MAX_HEADER,
+		"rts_header too large");
+
+/**
+ * struct accept_header - Wire format for ACCEPT packets.
+ * 
+ * send DCACP ACCEPT packets for matching from the receiver to the sender
+ */
+struct accept_header {
+	/** @common: Fields common to all packet types. */
+	struct common_header common;
+	
+	// *
+	//  * @offset: Byte offset within the message.
+	//  * 
+	//  * The sender should now transmit all data up to (but not including)
+	//  * this offset ASAP, if it hasn't already.
+	 
+	// __be32 offset;
+	
+	/**
+	 * @priority: The sender should use this priority level for all future
+	 * MESSAGE_FRAG packets for this message, until a GRANT is received
+	 * with higher offset. Larger numbers indicate higher priorities.
+	 */
+	__u8 priority;
+} __attribute__((packed));
+_Static_assert(sizeof(struct accept_header) <= HOMA_MAX_HEADER,
+		"accept_header too large");
+
+/**
+ * struct dcacp_grant_header - Wire format for DCACP_GRANT_HEADER packets.
+ * 
+ * send DCACP TOKEN packets for matching from the receiver to the sender
+ */
+struct dcacp_grant_header {
+	/** @common: Fields common to all packet types. */
+	struct common_header common;
+	
+	/**
+	 * @message_size: Remaining flow size of  the message.
+	 * 
+	 * The sender should now transmit all data up to (but not including)
+	 * this offset ASAP, if it hasn't already.
+	 */
+	__be64 message_size;
+	
+	/**
+	 * @priority: The sender should use this priority level for all future
+	 * MESSAGE_FRAG packets for this message, until a GRANT is received
+	 * with higher offset. Larger numbers indicate higher priorities.
+	 */
+	__u8 priority;
+} __attribute__((packed));
+_Static_assert(sizeof(struct dcacp_grant_header) <= HOMA_MAX_HEADER,
+		"dcacp_grant_header too large");
 
 /**
  * struct homa_message_out - Describes a message (either request or response)
@@ -509,6 +632,15 @@ struct homa_message_in {
 	 */
 	bool scheduled;
 	
+	/**
+		TODO: homa_sock 
+	*/
+		
+	/**
+		TODO: homa_peer 
+	*/
+
+
 	/**
 	 * @possibly_in_grant_queue: True means this RPC may be linked
 	 * into homa->grantable_rpcs. Zero means it can't possibly be in
@@ -710,6 +842,14 @@ struct homa_rpc {
 	 */
 	struct list_head throttled_links;
 	
+	/**
+	 * DCACP logic: Used to link this RPC into peer->incoming_rpcs if 
+	 * current state is HOMA_INCOMING;
+	 * If this RPC isn't in homa->throttled_rpcs, this is an empty
+	 * list pointing to itself.
+	 */
+	struct list_head peer_links;
+
 	/**
 	 * @silent_ticks: Number of times homa_timer has been invoked
 	 * since the last time a packet was received for this RPC.
@@ -1039,12 +1179,67 @@ struct homa_peer {
 	__u32 last_resend_tick;
 	
 	/**
+	* TODO: DCACP homa_message_in priority queue based on remaining flow size;
+	*/
+	struct list_head incoming_rpcs;
+
+
+	/**
 	 * @peertab_links: Links this object into a bucket of its
 	 * homa_peertab.
 	 */
 	struct hlist_node peertab_links;
 };
 
+#define MAX_DCACP_INCAST_RATIO 50
+/* 
+ dcacp rts
+*/
+struct dcacp_rts {
+    uint8_t iter;
+    uint32_t src_addr;
+    __be64 remaining_sz;
+};
+
+/*
+dcacp grant
+*/
+struct dcacp_grant {
+    bool prompt;
+    uint32_t dst_addr;
+    __be64 remaining_sz;
+};
+
+
+
+/* dcacp epoch
+
+*/
+struct dcacp_epoch {
+	/**
+	 * @lock: Must be held when modifying fields. This lock is used in place of sk->sk_lock
+	 * because it's used differently (it's always used as a simple
+	 * spin lock).  See sync.txt for more on Homa's synchronization
+	 * strategy.
+	 */
+	struct spinlock lock;
+	int epoch;
+	int iter;
+	bool prompt;
+	uint32_t match_src_addr;
+	uint32_t match_dst_addr;
+	struct dcacp_grant grants_q[MAX_DCACP_INCAST_RATIO];
+	struct dcacp_rts  rts_q[MAX_DCACP_INCAST_RATIO];
+	struct dcacp_rts* min_rts;
+	struct dcacp_grant* min_grant;
+	int grant_size;
+	int rts_size;
+	// struct rte_timer epoch_timer;
+	// struct rte_timer sender_iter_timers[10];
+	// struct rte_timer receiver_iter_timers[10];
+	// struct pim_timer_params pim_timer_params;
+	// uint64_t start_cycle;
+};
 /**
  * struct homa - Overall information about the Homa protocol implementation.
  * 
@@ -1072,6 +1267,14 @@ struct homa {
 	 */
 	struct homa_peertab peers;
 	
+	/**
+	 * DCACP Epoch
+	 */
+	struct dcacp_epoch epoch;
+
+	/**
+	 * TODO: add epoch thread to handle request 
+	 */
 	/**
 	 * @rtt_bytes: A conservative estimate of the amount of data that
 	 * can be sent over the wire in the time it takes to send a full-size
@@ -1949,9 +2152,20 @@ extern int      homa_xmit_control(enum homa_packet_type type, void *contents,
 			size_t length, struct homa_rpc *rpc);
 extern int      __homa_xmit_control(void *contents, size_t length,
 			struct homa_peer *peer, struct homa_sock *hsk);
-extern void     homa_xmit_data(struct homa_rpc *rpc, bool pacer);
+extern void     homa_xmit_data(struct homa_rpc *rpc, bool force);
 extern void     __homa_xmit_data(struct sk_buff *skb, struct homa_rpc *rpc,
 			int priority);
+
+
+/*
+  DCACP logic
+*/
+extern void dcacp_notification_pkt(struct sk_buff *skb);
+extern void dcacp_rts_pkt(struct sk_buff *skb);
+extern void dcacp_grant_pkt(struct sk_buff* skb);
+extern void dcacp_accept_pkt(struct sk_buff* skb);
+
+
 
 /**
  * check_pacer() - This method is invoked at various places in Homa to

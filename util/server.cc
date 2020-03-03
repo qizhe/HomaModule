@@ -26,6 +26,8 @@
  #include <arpa/inet.h>
 #include <chrono>         // std::chrono::seconds
 
+#include <iostream>
+
 #include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -102,6 +104,7 @@ void homa_server(std::string ip, int port)
 			printf("homa_recv failed: %s\n", strerror(errno));
 			continue;
 		}
+		std::cout << "length: " << length << std::endl;
 		if (validate) {
 			seed = check_buffer(&message[2],
 				length - 2*sizeof32(int));
@@ -327,8 +330,9 @@ int main(int argc, char** argv) {
 		printf("port number:%i\n", port + i);
 		workers.push_back(std::thread (homa_server, ip, port+i));
 	}
+	tcp_server(port);
+
 	for(int i = 0; i < num_ports; i++) {
 		workers[i].join();
 	}
-	// tcp_server(port);
 }

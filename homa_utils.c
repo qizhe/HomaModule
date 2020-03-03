@@ -109,6 +109,10 @@ int homa_init(struct homa *homa)
 	}
 	homa->pacer_exit = false;
 	atomic_set(&homa->pacer_active, 0);
+	/*
+	 * DCACP Logic
+	 */
+	
 	atomic64_set(&homa->link_idle_time, get_cycles());
 	homa->max_nic_queue_ns = 2000;
 	homa->cycles_per_kbyte = 0;
@@ -727,6 +731,20 @@ char *homa_print_packet_short(struct sk_buff *skb, char *buffer, int buf_len)
 	case FREEZE:
 		snprintf(buffer, buf_len, "FREEZE");
 		break;
+	
+	// for DCACP
+	case NOTIFICATION:
+		snprintf(buffer, buf_len, "NOTIFICATION");
+		break;
+	case RTS:
+		snprintf(buffer, buf_len, "RTS");
+		break;
+	case ACCEPT:
+		snprintf(buffer, buf_len, "ACCEPT");
+		break;
+	case DCACP_GRANT:
+		snprintf(buffer, buf_len, "DCACP_GRANT");
+		break;
 	default:
 		snprintf(buffer, buf_len, "unknown packet type %d",
 				common->type);
@@ -812,6 +830,7 @@ char *homa_symbol_for_type(uint8_t type)
 	switch (type) {
 	case DATA:
 		return "DATA";
+	// reuse for DCACP
 	case GRANT:
 		return "GRANT";
 	case RESEND:
@@ -824,6 +843,16 @@ char *homa_symbol_for_type(uint8_t type)
 		return "CUTOFFS";
 	case FREEZE:
 		return "FREEZE";
+
+	// for DCACP
+	case NOTIFICATION:
+		return "NOTIFICATION";
+	case RTS:
+		return "RTS";
+	case ACCEPT:
+		return "ACCEPT";
+	case DCACP_GRANT:
+		return "DCACP_GRANT";
 	}
 	
 	/* Using a static buffer can produce garbled text under concurrency,

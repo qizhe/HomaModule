@@ -860,6 +860,7 @@ struct sk_buff *mock_skb_new(__be32 saddr, struct common_header *h,
 	case DATA:
 		header_size = sizeof(struct data_header);
 		break;
+	// Resue for DCACP
 	case GRANT:
 		header_size = sizeof(struct grant_header);
 		break;
@@ -877,6 +878,19 @@ struct sk_buff *mock_skb_new(__be32 saddr, struct common_header *h,
 		break;
 	case FREEZE:
 		header_size = sizeof(struct freeze_header);
+		break;
+	// for DCACP
+	case NOTIFICATION:
+		header_size = sizeof(struct notification_header);
+		break;
+	case RTS:
+		header_size = sizeof(struct rts_header);
+		break;
+	case ACCEPT:
+		header_size = sizeof(struct accept_header);
+		break;
+	case DCACP_GRANT:
+		header_size = sizeof(struct dcacp_grant_header );
 		break;
 	default:
 		header_size = sizeof(struct common_header);

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright (c) 2019-2020, Stanford University
+# Copyright (c) 2019-2020 Stanford University
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# This script generates a pair of plots showing the CDF of message lengths,
+# This script generates a plot showing the CDF of message lengths,
 # gathered from one or more experiment runs.
 #
 # Usage: plot_length_dist.py name dir name dir ...

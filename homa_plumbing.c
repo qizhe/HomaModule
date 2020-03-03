@@ -645,6 +645,11 @@ int homa_ioc_send(struct sock *sk, unsigned long arg) {
 		crpc = NULL;
 		goto error;
 	}
+	// TODO: DCACP: transmit the notification packet first
+
+	// TODO: check whether the flow is short or long;
+
+
 	homa_xmit_data(crpc, false);
 
 	if (unlikely(copy_to_user(&((struct homa_args_send_ipv4 *) arg)->id,
@@ -903,6 +908,7 @@ int homa_pkt_recv(struct sk_buff *skb) {
 	 * skb_shinfo(skb)->frag_list by the Homa GRO mechanism. Each
 	 * iteration through this loop processes one of those packets.
 	 */
+	// other maintains the next packet
 	others = skb_shinfo(skb)->frag_list;
 	skb_shinfo(skb)->frag_list = NULL;
 	while (1) {
@@ -936,6 +942,8 @@ int homa_pkt_recv(struct sk_buff *skb) {
 			UNIT_LOG("", "pskb discard");
 			goto discard;
 		}
+		// The receive side of the transport layer might use this function during reception when removing a
+//       header from the packet. 
 		if (header_offset)
 			__skb_pull(skb, header_offset);
 		

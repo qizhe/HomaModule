@@ -323,6 +323,26 @@ void homa_pkt_dispatch(struct sk_buff *skb, struct homa_sock *hsk)
 		INC_METRIC(packets_received[CUTOFFS - DATA], 1);
 		homa_cutoffs_pkt(skb, hsk);
 		break;
+	/*
+	* DCACP logic
+	*/
+	case NOTIFICATION:
+		INC_METRIC(packets_received[NOTIFICATION - DATA], 1);
+		dcacp_notification_pkt(skb);
+		break;
+	case RTS:
+		INC_METRIC(packets_received[RTS - DATA], 1);
+		dcacp_rts_pkt(skb);
+		break;
+	case DCACP_GRANT:
+		INC_METRIC(packets_received[DCACP_GRANT - DATA], 1);
+		dcacp_grant_pkt(skb);
+		break;
+	case ACCEPT:
+		INC_METRIC(packets_received[ACCEPT - DATA], 1);
+		dcacp_accept_pkt(skb);
+		break;
+
 	default:
 		INC_METRIC(unknown_packet_types, 1);
 		goto discard;
@@ -445,7 +465,8 @@ int homa_data_pkt(struct sk_buff *skb, struct homa_rpc *rpc)
 void homa_grant_pkt(struct sk_buff *skb, struct homa_rpc *rpc)
 {
 	struct grant_header *h = (struct grant_header *) skb->data;
-	
+	tt_record3("processing grant for id %llu, offset %d, priority %d",
+			h->common.id, ntohl(h->offset), h->priority);
 	if (rpc->state == RPC_OUTGOING) {
 		int new_offset = ntohl(h->offset);
 
@@ -463,8 +484,7 @@ void homa_grant_pkt(struct sk_buff *skb, struct homa_rpc *rpc)
 			homa_rpc_free(rpc);
 		}
 	}
-	tt_record3("processed grant for id %llu, offset %d, state %d",
-			h->common.id, ntohl(h->offset), rpc->state);
+
 	kfree_skb(skb);
 }
 
@@ -589,6 +609,41 @@ void homa_cutoffs_pkt(struct sk_buff *skb, struct homa_sock *hsk)
 	kfree_skb(skb);
 }
 
+
+/* DCACP logic
+
+* dcacp_notification_pkt() - Handler for incoming NOTIFICATIOn packets
+*
+*/
+void dcacp_notification_pkt(struct sk_buff *skb) {
+
+}
+
+/*
+* dcacp_rts_pkt() - Handler for incoming RTS packets
+*
+*/
+void dcacp_rts_pkt(struct sk_buff *skb) {
+
+}
+
+/*
+* dcacp_grant_pkt() - Handler for incoming GRANT packets
+*
+*/
+void dcacp_grant_pkt(struct sk_buff *skb) {
+
+}
+
+/*
+* dcacp_accept_pkt() - Handler for incoming ACCEPT packets
+*
+*/
+void dcacp_accept_pkt(struct sk_buff *skb) {
+
+}
+
+
 /**
  * homa_manage_grants() - This function is invoked to set priorities of
  * messages for grants, determine whether grants can be sent out and, if so,
@@ -702,8 +757,8 @@ void homa_manage_grants(struct homa *homa, struct homa_rpc *rpc)
 			/* Don't do anything if the grant couldn't be sent; let
 			 * other retry mechanisms handle this. */
 		}
-		tt_record2("sent grant for id %llu, offset %d", candidate->id,
-				new_grant);
+		tt_record3("sent grant for id %llu, offset %d, priority %d",
+			candidate->id, new_grant, priority);
 	}
 	homa_grantable_unlock(homa);
 }
@@ -1048,7 +1103,7 @@ done:
  * a waiting reader or queues the RPC.
  * @rpc:                RPC that now has a complete input message;
  *                      must be locked. The caller must also have
- *                      locked the socket this RPC.
+ *                      locked the socket for this RPC.
  */
 void homa_rpc_ready(struct homa_rpc *rpc)
 {
