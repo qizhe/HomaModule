@@ -353,10 +353,10 @@ void test_read(int fd, int count)
 void test_rtt(int fd, struct sockaddr *dest, char *request)
 {
 	uint64_t id;
-	char response[1000000];
-	struct sockaddr_in server_addr;
+	// char response[1000000];
+	// struct sockaddr_in server_addr;
 	int status;
-	ssize_t resp_length;
+	// ssize_t resp_length;
 	uint64_t start;
 	uint64_t times[count];
     std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
@@ -372,19 +372,19 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 						strerror(errno));
 				return;
 			}
-			resp_length = homa_recv(fd, response, sizeof(response),
-				HOMA_RECV_RESPONSE, &id,
-				(struct sockaddr *) &server_addr, sizeof(server_addr));
+			// resp_length = homa_recv(fd, response, sizeof(response),
+			// 	HOMA_RECV_RESPONSE, &id,
+			// 	(struct sockaddr *) &server_addr, sizeof(server_addr));
 			if (i >= 0)
 				times[i] = rdtsc() - start;
-			if (resp_length < 0) {
-				printf("Error in homa_recv: %s\n",
-						strerror(errno));
-				return;
-			}
-			if (resp_length != length)
-				printf("Expected %d bytes in response, received %ld\n",
-						length, resp_length);
+			// if (resp_length < 0) {
+			// 	printf("Error in homa_recv: %s\n",
+			// 			strerror(errno));
+			// 	return;
+			// }
+			// if (resp_length != length)
+			// 	printf("Expected %d bytes in response, received %ld\n",
+			// 			length, resp_length);
 		}
 		print_dist(times, count);
 		printf("Bandwidth at median: %.1f MB/sec\n",
