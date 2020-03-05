@@ -357,14 +357,17 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 	struct sockaddr_in server_addr;
 	int status;
 	ssize_t resp_length;
-	uint64_t start;
+	uint64_t start_cycles = rdtsc();
 	uint64_t times[count];
+	uint64_t bytes_sent, start_bytes;
+	double rate;
     std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
     while(1) {
 		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
 	            break;
+	    start_bytes = bytes_sent = 0;
 		for (int i = -10; i < count; i++) {
-			start = rdtsc();
+			start_cycles = rdtsc();
 			status = homa_send(fd, request, length, dest,
 					sizeof(*dest), &id);
 			if (status < 0) {
@@ -376,7 +379,8 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 				HOMA_RECV_RESPONSE, &id,
 				(struct sockaddr *) &server_addr, sizeof(server_addr));
 			if (i >= 0)
-				times[i] = rdtsc() - start;
+				times[i] = rdtsc() - start_cycles;
+			bytes_sent += length;
 			if (resp_length < 0) {
 				printf("Error in homa_recv: %s\n",
 						strerror(errno));
@@ -386,9 +390,14 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 			// 	printf("Expected %d bytes in response, received %ld\n",
 			// 			length, resp_length);
 		}
+		uint64_t end_cycles = rdtsc();
+	    rate = ((double) bytes_sent - start_bytes)/ to_seconds(
+			end_cycles - start_cycles);
 		print_dist(times, count);
-		printf("Bandwidth at median: %.1f MB/sec\n",
-				2.0*((double) length)/(to_seconds(times[count/2])*1e06));
+		// printf("Bandwidth at median: %.1f MB/sec\n",
+		// 		2.0*((double) length)/(to_seconds(times[count/2])*1e06));
+		printf("Homa throughput using %d byte messages: "
+			"%.2f GB/sec\n", length, rate*1e-09);
     }
 
 }
