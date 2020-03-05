@@ -570,9 +570,11 @@ void tcp_ping(int fd, void *request, int length)
 			exit(1);
 		}
 		response_length += num_bytes;
-		if (response_length == int_response[1])
-			break;
+		if (response_length == 1)
+			continue;
 		if (response_length < 2*sizeof32(int))
+			continue;
+		if (response_length < int_response[1])
 			continue;
 		if (response_length != int_response[1])
 			printf("Expected %d bytes in response, got %d\n",
