@@ -357,7 +357,7 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 	struct sockaddr_in server_addr;
 	int status;
 	ssize_t resp_length;
-	uint64_t start_cycles = rdtsc();
+	uint64_t start_cycles = rdtsc(), iter_cycles = rdtsc();
 	uint64_t times[count];
 	uint64_t bytes_sent, start_bytes;
 	double rate;
@@ -366,8 +366,9 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
 	            break;
 	    start_bytes = bytes_sent = 0;
+	    start_cycles = rdtsc();
 		for (int i = -10; i < count; i++) {
-			start_cycles = rdtsc();
+			iter_cycles = rdtsc();
 			status = homa_send(fd, request, length, dest,
 					sizeof(*dest), &id);
 			if (status < 0) {
@@ -379,7 +380,7 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 				HOMA_RECV_RESPONSE, &id,
 				(struct sockaddr *) &server_addr, sizeof(server_addr));
 			if (i >= 0)
-				times[i] = rdtsc() - start_cycles;
+				times[i] = rdtsc() - iter_cycles;
 			bytes_sent += length;
 			if (resp_length < 0) {
 				printf("Error in homa_recv: %s\n",
