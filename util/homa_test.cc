@@ -46,7 +46,7 @@
 int length = 1000000;
 
 /* How many iterations to perform for the test. */
-int count = 100000;
+int count = 1000;
 
 /* Used to generate "somewhat random but predictable" contents for buffers. */
 int seed = 12345;
