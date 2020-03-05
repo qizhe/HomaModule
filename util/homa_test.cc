@@ -46,7 +46,7 @@
 int length = 1000000;
 
 /* How many iterations to perform for the test. */
-int count = 1000;
+int count = 10000;
 
 /* Used to generate "somewhat random but predictable" contents for buffers. */
 int seed = 12345;
@@ -353,10 +353,10 @@ void test_read(int fd, int count)
 void test_rtt(int fd, struct sockaddr *dest, char *request)
 {
 	uint64_t id;
-	// char response[1000000];
-	// struct sockaddr_in server_addr;
+	char response[1000000];
+	struct sockaddr_in server_addr;
 	int status;
-	// ssize_t resp_length;
+	ssize_t resp_length;
 	uint64_t start_cycles = rdtsc(), iter_cycles = rdtsc();
 	uint64_t times[count];
 	uint64_t bytes_sent, start_bytes;
@@ -376,17 +376,17 @@ void test_rtt(int fd, struct sockaddr *dest, char *request)
 						strerror(errno));
 				return;
 			}
-			// resp_length = homa_recv(fd, response, sizeof(response),
-			// 	HOMA_RECV_RESPONSE, &id,
-			// 	(struct sockaddr *) &server_addr, sizeof(server_addr));
+			resp_length = homa_recv(fd, response, sizeof(response),
+				HOMA_RECV_RESPONSE, &id,
+				(struct sockaddr *) &server_addr, sizeof(server_addr));
 			if (i >= 0)
 				times[i] = rdtsc() - iter_cycles;
 			bytes_sent += length;
-			// if (resp_length < 0) {
-			// 	printf("Error in homa_recv: %s\n",
-			// 			strerror(errno));
-			// 	return;
-			// }
+			if (resp_length < 0) {
+				printf("Error in homa_recv: %s\n",
+						strerror(errno));
+				return;
+			}
 			// if (resp_length != length)
 			// 	printf("Expected %d bytes in response, received %ld\n",
 			// 			length, resp_length);

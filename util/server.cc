@@ -66,13 +66,13 @@ bool validate = false;
  */
 void homa_server(std::string ip, int port)
 {
-	printf("start homa server\n");
 	int fd;
 	struct sockaddr_in addr_in;
 	int message[1000000];
 	struct sockaddr_in source;
 	int length;
-	
+	uint64_t total_length = 0, count = 0;
+	uint64_t start_cycle = 0, end_cycle = 0;
 	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_HOMA);
 	if (fd < 0) {
 		printf("Couldn't open Homa socket: %s\n", strerror(errno));
@@ -104,7 +104,6 @@ void homa_server(std::string ip, int port)
 			printf("homa_recv failed: %s\n", strerror(errno));
 			continue;
 		}
-		std::cout << "length: " << length << std::endl;
 		if (validate) {
 			seed = check_buffer(&message[2],
 				length - 2*sizeof32(int));
@@ -119,11 +118,25 @@ void homa_server(std::string ip, int port)
 					"%d bytes, id %lu, response length %d\n",
 					print_address(&source), length, id,
 					message[1]);
+		if(count % 1000 == 0) {
+			end_cycle = rdtsc();
+			
+			double rate = ((double) total_length)/ to_seconds(
+				end_cycle - start_cycle);
+			total_length = 0;
 
+			start_cycle = rdtsc();
+			if(count != 0) {
+				printf("Homa throughput: "
+				"%.2f GB/sec\n", rate*1e-09);
+			}
+		}
+		total_length += length;
+		count += 1;
 		/* Second word of the message indicates how large a
 		 * response to send.
 		 */
-		result = homa_reply(fd, message, message[1],
+		result = homa_reply(fd, message, 1,
 			(struct sockaddr *) &source, sizeof(source), id);
 		if (result < 0) {
 			printf("Homa_reply failed: %s\n", strerror(errno));
