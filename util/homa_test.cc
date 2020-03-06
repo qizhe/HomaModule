@@ -46,7 +46,7 @@
 int length = 1000000;
 
 /* How many iterations to perform for the test. */
-int count = 10000;
+int count = 1000;
 
 /* Used to generate "somewhat random but predictable" contents for buffers. */
 int seed = 12345;
@@ -464,81 +464,208 @@ void test_shutdown(int fd)
  * @fd:       Homa socket
  * @dest:     Where to send requests
  */
-void test_stream(int fd, struct sockaddr *dest)
+// void test_stream(int fd, struct sockaddr *dest)
+// {
+// #define MAX_RPCS 100
+// 	int *buffers[MAX_RPCS];
+// 	int response[100];
+// 	ssize_t resp_length;
+// 	uint64_t id, end_cycles;
+// 	uint64_t start_cycles = 0;
+// 	int status, i;
+// 	int64_t bytes_sent = 0;
+// 	int64_t start_bytes = 0;
+// 	double rate;
+	
+// 	if (count > MAX_RPCS) {
+// 		printf("Count too large; reducing from %d to %d\n", count,
+// 				MAX_RPCS);
+// 		count = MAX_RPCS;
+// 	}
+// 	for (i = 0; i < count; i++) {
+// 		buffers[i] = (int *) malloc(length);
+// 		buffers[i][0] = length;
+// 		buffers[i][1] = 12;
+// 		seed_buffer(buffers[i]+2, length - 2*sizeof32(int), 1000*i);
+// 	}
+// 	for (i = 0; i < count; i++) {
+// 		status = homa_send(fd, buffers[i], length, dest,
+// 				sizeof(*dest), &id);
+// 		if (status < 0) {
+// 			printf("Error in homa_send: %s\n", strerror(errno));
+// 			return;
+// 		}
+// 	}
+	
+// 	/* Each iteration through the following the loop waits for a
+// 	 * response to an outstanding request, then initiates a new
+// 	 * request.
+// 	 */
+// 	while (1){
+// 		id = 0;
+// 		resp_length = homa_recv(fd, response, sizeof(response),
+// 			HOMA_RECV_RESPONSE, &id, NULL, 0);
+// 		if (resp_length < 0) {
+// 			printf("Error in homa_recv: %s\n",
+// 					strerror(errno));
+// 			return;
+// 		}
+// 		if (resp_length != 12)
+// 			printf("Expected 12 bytes in response, received %ld\n",
+// 					resp_length);
+// 		status = homa_send(fd, buffers[(response[2]/1000) %count],
+// 				length, dest, sizeof(*dest), &id);
+// 		if (status < 0) {
+// 			printf("Error in homa_send: %s\n", strerror(errno));
+// 			return;
+// 		}
+// 		bytes_sent += length;
+// 		if (bytes_sent > 1001000000)
+// 			break;
+		
+// 		/* Don't start timing until we've sent a few bytes to warm
+// 		 * everything up.
+// 		 */
+// 		if ((start_bytes == 0) && (bytes_sent > 1000000)) {
+// 			start_bytes = bytes_sent;
+// 			start_cycles = rdtsc();
+// 		}
+// 	}
+// 	end_cycles = rdtsc();
+// 	rate = ((double) bytes_sent - start_bytes)/ to_seconds(
+// 			end_cycles - start_cycles);
+// 	printf("Homa throughput using %d concurrent %d byte messages: "
+// 			"%.2f GB/sec\n", count, length, rate*1e-09);
+	
+// 	for (i = 0; i < count; i++)
+// 		free(buffers[i]);
+// }
+
+void test_stream(int fd, struct sockaddr *dest, char *request)
 {
-#define MAX_RPCS 100
-	int *buffers[MAX_RPCS];
-	int response[100];
-	ssize_t resp_length;
-	uint64_t id, end_cycles;
-	uint64_t start_cycles = 0;
-	int status, i;
+	uint64_t id;
+	// char response[1000000];
+	// struct sockaddr_in server_addr;
+	int status;
+	// ssize_t resp_length;
+	uint64_t start_cycles = rdtsc();
+	uint64_t bytes_sent, start_bytes;
+	double rate;
+    std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
+    while(1) {
+		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
+	            break;
+	    start_bytes = bytes_sent = 0;
+	    start_cycles = rdtsc();
+		for (int i = 0; i < count; i++) {
+			status = homa_send(fd, request, length, dest,
+					sizeof(*dest), &id);
+			if (status < 0) {
+				printf("Error in homa_send: %s\n",
+						strerror(errno));
+				return;
+			}
+			bytes_sent += length;
+
+			// resp_length = homa_recv(fd, response, sizeof(response),
+			// 	HOMA_RECV_RESPONSE, &id,
+			// 	(struct sockaddr *) &server_addr, sizeof(server_addr));
+
+			// if (resp_length < 0) {
+			// 	printf("Error in homa_recv: %s\n",
+			// 			strerror(errno));
+			// 	return;
+			// }
+			// if (resp_length != length)
+			// 	printf("Expected %d bytes in response, received %ld\n",
+			// 			length, resp_length);
+		}
+		uint64_t end_cycles = rdtsc();
+	    rate = ((double) bytes_sent - start_bytes)/ to_seconds(
+			end_cycles - start_cycles);
+		// print_dist(times, count);
+		// printf("Bandwidth at median: %.1f MB/sec\n",
+		// 		2.0*((double) length)/(to_seconds(times[count/2])*1e06));
+		printf("Homa throughput using %d byte messages: "
+			"%.2f Gbps/sec\n", length, rate * 1e-09 * 8);
+    }
+
+}
+
+/**
+ * test_tcpstream() - Measure throughput of a TCP socket using --length as
+ * the size of the buffer for each write system call.
+ * @server_name:  Name of the server machine.
+ * @port:         Server port to connect to.
+ */
+void test_tcpstream(char *server_name, int port)
+{
+	struct addrinfo hints;
+	struct addrinfo *matching_addresses;
+	struct sockaddr *dest;
+	int status;
+	int buffer[1000000];
 	int64_t bytes_sent = 0;
 	int64_t start_bytes = 0;
-	double rate;
+	uint64_t start_cycles = 0;
+	double elapsed, rate;
 	
-	if (count > MAX_RPCS) {
-		printf("Count too large; reducing from %d to %d\n", count,
-				MAX_RPCS);
-		count = MAX_RPCS;
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	status = getaddrinfo(server_name, "80", &hints, &matching_addresses);
+	if (status != 0) {
+		printf("Couldn't look up address for %s: %s\n",
+				server_name, gai_strerror(status));
+		return;
 	}
-	for (i = 0; i < count; i++) {
-		buffers[i] = (int *) malloc(length);
-		buffers[i][0] = length;
-		buffers[i][1] = 12;
-		seed_buffer(buffers[i]+2, length - 2*sizeof32(int), 1000*i);
-	}
-	for (i = 0; i < count; i++) {
-		status = homa_send(fd, buffers[i], length, dest,
-				sizeof(*dest), &id);
-		if (status < 0) {
-			printf("Error in homa_send: %s\n", strerror(errno));
-			return;
-		}
-	}
+	dest = matching_addresses->ai_addr;
+	((struct sockaddr_in *) dest)->sin_port = htons(port);
 	
-	/* Each iteration through the following the loop waits for a
-	 * response to an outstanding request, then initiates a new
-	 * request.
-	 */
-	while (1){
-		id = 0;
-		resp_length = homa_recv(fd, response, sizeof(response),
-			HOMA_RECV_RESPONSE, &id, NULL, 0);
-		if (resp_length < 0) {
-			printf("Error in homa_recv: %s\n",
-					strerror(errno));
-			return;
-		}
-		if (resp_length != 12)
-			printf("Expected 12 bytes in response, received %ld\n",
-					resp_length);
-		status = homa_send(fd, buffers[(response[2]/1000) %count],
-				length, dest, sizeof(*dest), &id);
-		if (status < 0) {
-			printf("Error in homa_send: %s\n", strerror(errno));
-			return;
-		}
-		bytes_sent += length;
-		if (bytes_sent > 1001000000)
-			break;
-		
+	int fd = socket(PF_INET, SOCK_STREAM, 0);
+	if (fd == -1) {
+		printf("Couldn't open client socket: %s\n", strerror(errno));
+		return;
+	}
+	if (connect(fd, dest, sizeof(struct sockaddr_in)) == -1) {
+		printf("Couldn't connect to %s:%d: %s\n", server_name, port,
+				strerror(errno));
+		return;
+	}
+	int flag = 1;
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+	buffer[0] = -1;
+	std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
+
+	while (1) {
+		start_bytes = bytes_sent = 0;
+	    start_cycles = rdtsc();
+
+		// if (bytes_sent > 1010000000)
+		// 	break;
+		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
+	            break;
+
+	    for (int i = 0; i < count; i++) {
+	    	if (write(fd, buffer, length) != length) {
+				printf("Socket write failed: %s\n", strerror(errno));
+				return;
+			}
+			bytes_sent += length;
+
+	    }
 		/* Don't start timing until we've sent a few bytes to warm
 		 * everything up.
 		 */
-		if ((start_bytes == 0) && (bytes_sent > 1000000)) {
-			start_bytes = bytes_sent;
-			start_cycles = rdtsc();
-		}
+		// if ((start_bytes == 0) && (bytes_sent > 10000000)) {
+		// 	start_bytes = bytes_sent;
+		// 	start_cycles = rdtsc();
+		// }
+		elapsed = to_seconds(rdtsc() - start_cycles);
+		rate = ((double) bytes_sent - start_bytes) / elapsed;
+		printf("TCP throughput using %d byte buffers: %.2f Gb/sec\n",
+			length, rate * 1e-09 * 8);	
 	}
-	end_cycles = rdtsc();
-	rate = ((double) bytes_sent - start_bytes)/ to_seconds(
-			end_cycles - start_cycles);
-	printf("Homa throughput using %d concurrent %d byte messages: "
-			"%.2f GB/sec\n", count, length, rate*1e-09);
-	
-	for (i = 0; i < count; i++)
-		free(buffers[i]);
 }
 
 /**
@@ -656,73 +783,6 @@ void test_tcp(char *server_name, int port)
 	return;
 }
 
-/**
- * test_tcpstream() - Measure throughput of a TCP socket using --length as
- * the size of the buffer for each write system call.
- * @server_name:  Name of the server machine.
- * @port:         Server port to connect to.
- */
-void test_tcpstream(char *server_name, int port)
-{
-	struct addrinfo hints;
-	struct addrinfo *matching_addresses;
-	struct sockaddr *dest;
-	int status;
-	int buffer[1000000];
-	int64_t bytes_sent = 0;
-	int64_t start_bytes = 0;
-	uint64_t start_cycles = 0;
-	double elapsed, rate;
-	
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-	status = getaddrinfo(server_name, "80", &hints, &matching_addresses);
-	if (status != 0) {
-		printf("Couldn't look up address for %s: %s\n",
-				server_name, gai_strerror(status));
-		return;
-	}
-	dest = matching_addresses->ai_addr;
-	((struct sockaddr_in *) dest)->sin_port = htons(port);
-	
-	int fd = socket(PF_INET, SOCK_STREAM, 0);
-	if (fd == -1) {
-		printf("Couldn't open client socket: %s\n", strerror(errno));
-		return;
-	}
-	if (connect(fd, dest, sizeof(struct sockaddr_in)) == -1) {
-		printf("Couldn't connect to %s:%d: %s\n", server_name, port,
-				strerror(errno));
-		return;
-	}
-	int flag = 1;
-	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
-	buffer[0] = -1;
-	
-	while (1) {
-		if (write(fd, buffer, length) != length) {
-			printf("Socket write failed: %s\n", strerror(errno));
-			return;
-		}
-		bytes_sent += length;
-		if (bytes_sent > 1010000000)
-			break;
-		
-		/* Don't start timing until we've sent a few bytes to warm
-		 * everything up.
-		 */
-		if ((start_bytes == 0) && (bytes_sent > 10000000)) {
-			start_bytes = bytes_sent;
-			start_cycles = rdtsc();
-		}
-		
-	}
-	elapsed = to_seconds(rdtsc() - start_cycles);
-	rate = ((double) bytes_sent - start_bytes) / elapsed;
-	printf("TCP throughput using %d byte buffers: %.2f GB/sec\n",
-			length, rate*1e-09);
-}
 
 /**
  * test_udpclose() - Close a UDP socket while a thread is waiting on it.
@@ -887,7 +947,7 @@ int main(int argc, char** argv)
 		} else if (strcmp(argv[nextArg], "shutdown") == 0) {
 			test_shutdown(fd);
 		} else if (strcmp(argv[nextArg], "stream") == 0) {
-			test_stream(fd, dest);
+			test_stream(fd, dest, buffer);
 		} else if (strcmp(argv[nextArg], "tcp") == 0) {
 			test_tcp(host, port);
 		} else if (strcmp(argv[nextArg], "tcpstream") == 0) {
