@@ -858,7 +858,7 @@ int main(int argc, char** argv)
 	memset(&addr_in, 0, sizeof(addr_in));
 	addr_in.sin_family = AF_INET;
 	addr_in.sin_port = htons(4000);
-	inet_pton(AF_INET, "10.0.0.10", &addr_in.sin_addr);
+	inet_pton(AF_INET, "192.168.10.115", &addr_in.sin_addr);
 	// inet_aton("10.0.0.10", &addr_in.sin_addr);
 	// addr_in.sin_addr.s_addr = INADDR_ANY;
 
