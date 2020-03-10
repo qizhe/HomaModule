@@ -24,6 +24,9 @@
 #include <ctime>
 #include<chrono>
 #include <errno.h>
+#include <netinet/if_ether.h>
+#include <netinet/ip.h>
+#include <netinet/udp.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <poll.h>
@@ -41,6 +44,13 @@
 
 #include "homa.h"
 #include "test_utils.h"
+#ifndef ETH_MAX_MTU
+#define ETH_MAX_MTU	0xFFFFU
+#endif
+
+#ifndef UDP_SEGMENT
+#define UDP_SEGMENT		103
+#endif
 
 /* Determines message size in bytes for tests. */
 int length = 1000000;
@@ -647,11 +657,11 @@ void test_tcpstream(char *server_name, int port)
 	            break;
 
 	    for (int i = 0; i < count; i++) {
-	    	if (write(fd, buffer, length) != length) {
+	    	if (write(fd, buffer, 1000000) != 1000000) {
 				printf("Socket write failed: %s\n", strerror(errno));
 				return;
 			}
-			bytes_sent += length;
+			bytes_sent += 1000000;
 
 	    }
 		/* Don't start timing until we've sent a few bytes to warm
@@ -664,6 +674,82 @@ void test_tcpstream(char *server_name, int port)
 		elapsed = to_seconds(rdtsc() - start_cycles);
 		rate = ((double) bytes_sent - start_bytes) / elapsed;
 		printf("TCP throughput using %d byte buffers: %.2f Gb/sec\n",
+			length, rate * 1e-09 * 8);	
+	}
+}
+
+
+/**
+ * udp_tcpstream() - Measure throughput of a UDP socket using --length as
+ * the size of the buffer for each write system call.
+ * @server_name:  Name of the server machine.
+ * @port:         Server port to connect to.
+ */
+void test_udpstream(char *server_name, int port)
+{
+	struct addrinfo hints;
+	struct addrinfo *matching_addresses;
+	struct sockaddr *dest;
+	int status;
+	int buffer[1000000];
+	int64_t bytes_sent = 0;
+	int64_t start_bytes = 0;
+	uint64_t start_cycles = 0;
+	double elapsed, rate;
+	
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	status = getaddrinfo(server_name, "80", &hints, &matching_addresses);
+	if (status != 0) {
+		printf("Couldn't look up address for %s: %s\n",
+				server_name, gai_strerror(status));
+		return;
+	}
+	dest = matching_addresses->ai_addr;
+	((struct sockaddr_in *) dest)->sin_port = htons(port);
+	
+	int fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (fd == -1) {
+		printf("Couldn't open client socket: %s\n", strerror(errno));
+		return;
+	}
+	int gso_size = ETH_DATA_LEN - sizeof(struct iphdr) - sizeof(struct udphdr);
+	if (setsockopt(fd, SOL_UDP, UDP_SEGMENT, &gso_size, sizeof(gso_size))) {
+		return;
+	}
+	buffer[0] = -1;
+	std::chrono::steady_clock::time_point start_clock = std::chrono::steady_clock::now();
+
+	while (1) {
+		start_bytes = bytes_sent = 0;
+	    start_cycles = rdtsc();
+
+		// if (bytes_sent > 1010000000)
+		// 	break;
+		if(std::chrono::steady_clock::now() - start_clock > std::chrono::seconds(60)) 
+	            break;
+
+	    for (int i = 0; i < count * 100; i++) {
+	    	int result = sendto(fd, buffer, 64000, MSG_CONFIRM, dest, sizeof(struct sockaddr_in));			
+			if( result < 0 ) {
+				printf("Socket write failed: %s %d\n", strerror(errno), result);
+
+				return;
+			}
+			bytes_sent += result;
+
+	    }
+		/* Don't start timing until we've sent a few bytes to warm
+		 * everything up.
+		 */
+		// if ((start_bytes == 0) && (bytes_sent > 10000000)) {
+		// 	start_bytes = bytes_sent;
+		// 	start_cycles = rdtsc();
+		// }
+		elapsed = to_seconds(rdtsc() - start_cycles);
+		rate = ((double) bytes_sent - start_bytes) / elapsed;
+		printf("UDP throughput using %d byte buffers: %.2f Gb/sec\n",
 			length, rate * 1e-09 * 8);	
 	}
 }
@@ -954,6 +1040,8 @@ int main(int argc, char** argv)
 			test_tcpstream(host, port);
 		} else if (strcmp(argv[nextArg], "udpclose") == 0) {
 			test_udpclose();
+		} else if (strcmp(argv[nextArg], "udpstream") == 0) {
+			test_udpstream(host, port);
 		} else {
 			printf("Unknown operation '%s'\n", argv[nextArg]);
 			exit(1);
